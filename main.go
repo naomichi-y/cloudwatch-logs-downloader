@@ -73,7 +73,7 @@ func log_events(svc *cloudwatchlogs.CloudWatchLogs, g string, s string, b int64,
 }
 
 func main() {
-  file = "./result_" + time.Now().Format("2006010230405") + ".log"
+  file = "./dist/result_" + time.Now().Format("2006010230405") + ".log"
 
   var group = flag.String("group", "", "Log group")
   var start = flag.String("start", "", "Start date")
