@@ -1,136 +1,136 @@
 package main
 
 import (
-  "log"
-  "time"
-  "os"
-  "fmt"
-  "encoding/json"
-  "flag"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"time"
 
-  "github.com/aws/aws-sdk-go/aws"
-  "github.com/aws/aws-sdk-go/aws/session"
-  "github.com/aws/aws-sdk-go/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 )
 
 var file string
 
 func write(data string) {
-  log.Print("Write results...")
+	log.Print("Write results...")
 
-  fp, err := os.OpenFile(file, os.O_WRONLY | os.O_CREATE | os.O_APPEND, 0644)
+	fp, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 
-  if err != nil {
-    log.Fatal(err)
-  }
+	if err != nil {
+		log.Fatal(err)
+	}
 
-  defer fp.Close()
-  fmt.Fprintln(fp, data)
+	defer fp.Close()
+	fmt.Fprintln(fp, data)
 }
 
-func log_events(svc *cloudwatchlogs.CloudWatchLogs, g string, s string, b int64, f int64) {
-  log.Print("Searching log events...")
+func log_events(service *cloudwatchlogs.CloudWatchLogs, group string, stream string, start int64, end int64) {
+	log.Print("Searching log events...")
 
-  var nextToken *string = nil
-  var list []map[string]string
+	var token *string = nil
+	var result []map[string]string
 
-  for {
-    resp, err := svc.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{
-      LogGroupName: aws.String(g),
-      LogStreamName: aws.String(s),
-      StartTime: aws.Int64(b),
-      EndTime: aws.Int64(f),
-      NextToken: nextToken,
-    })
+	for {
+		resp, err := service.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{
+			LogGroupName:  aws.String(group),
+			LogStreamName: aws.String(stream),
+			StartTime:     aws.Int64(start),
+			EndTime:       aws.Int64(end),
+			NextToken:     token,
+		})
 
-    if err != nil {
-      log.Fatal(err)
-    }
+		if err != nil {
+			log.Fatal(err)
+		}
 
-    for _, v := range resp.Events {
-      r := map[string]string{
-        "Message": aws.StringValue(v.Message),
-        "Timestamp": time.Unix(aws.Int64Value(v.Timestamp) / 1000, 0).String(),
-      }
-      list = append(list, r)
-      log.Print(r)
-    }
+		for _, v := range resp.Events {
+			r := map[string]string{
+				"Message":   aws.StringValue(v.Message),
+				"Timestamp": time.Unix(aws.Int64Value(v.Timestamp)/1000, 0).String(),
+			}
+			result = append(result, r)
+			log.Print(r)
+		}
 
-    if aws.StringValue(nextToken) == aws.StringValue(resp.NextForwardToken) {
-      break
-    }
+		if aws.StringValue(token) == aws.StringValue(resp.NextForwardToken) {
+			break
+		}
 
-    nextToken = resp.NextForwardToken
-  }
+		token = resp.NextForwardToken
+	}
 
-  data, err := json.MarshalIndent(list, "", "  ")
+	data, err := json.MarshalIndent(result, "", "  ")
 
-  if err != nil {
-    log.Fatal(err)
-  }
+	if err != nil {
+		log.Fatal(err)
+	}
 
-  write(string(data))
+	write(string(data))
+}
+
+func search_log_group(service *cloudwatchlogs.CloudWatchLogs, group string, start int64, end int64) {
+	log.Print("Searching log groups...")
+
+	var token *string = nil
+
+	for {
+		resp, err := service.DescribeLogStreams(&cloudwatchlogs.DescribeLogStreamsInput{
+			LogGroupName:        aws.String(group),
+			LogStreamNamePrefix: aws.String("app/app"),
+			NextToken:           token,
+		})
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, v := range resp.LogStreams {
+			if aws.Int64Value(v.CreationTime) <= start && end <= aws.Int64Value(v.LastEventTimestamp) {
+				log.Print("Found log group: " + aws.StringValue(v.Arn))
+				log_events(service, group, *v.LogStreamName, start, end)
+			}
+		}
+
+		token = resp.NextToken
+
+		if token == nil {
+			break
+		}
+	}
 }
 
 func main() {
-  file = "./dist/result_" + time.Now().Format("2006010230405") + ".log"
+	group := flag.String("group", "", "Log group")
+	start := flag.String("start", "", "Start date")
+	end := flag.String("end", "", "End date")
+	layout := "2006-01-02 15:04:05"
 
-  var group = flag.String("group", "", "Log group")
-  var start = flag.String("start", "", "Start date")
-  var end = flag.String("end", "", "End date")
+	flag.Parse()
 
-  flag.Parse()
+	s, err := time.Parse(layout, *start)
 
-  sess := session.Must(session.NewSession())
-  svc := cloudwatchlogs.New(
-    sess,
-    aws.NewConfig().WithRegion(os.Getenv("AWS_REGION")),
-  )
+	if err != nil {
+		log.Fatal(err)
+	}
 
-  var nextToken *string = nil
-  var layout = "2006-01-02 15:04:05"
+	e, err := time.Parse(layout, *end)
 
-  s, err := time.Parse(layout, *start)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-  if err != nil {
-    log.Fatal(err)
-  }
+	sess := session.Must(session.NewSession())
+	service := cloudwatchlogs.New(
+		sess,
+		aws.NewConfig().WithRegion(os.Getenv("AWS_REGION")),
+	)
+	file = "./dist/result_" + time.Now().Format("2006010230405") + ".log"
 
-  e, err := time.Parse(layout, *end)
+	search_log_group(service, *group, int64(s.Unix() * 1000), int64(e.Unix() * 1000))
 
-  if err != nil {
-    log.Fatal(err)
-  }
-
-  startUnixtime := int64(s.Unix() * 1000)
-  endUnixtime := int64(e.Unix() * 1000)
-
-  log.Print("Searching log groups...")
-
-  for {
-    resp, err := svc.DescribeLogStreams(&cloudwatchlogs.DescribeLogStreamsInput{
-      LogGroupName: aws.String(*group),
-      LogStreamNamePrefix: aws.String("app/app"),
-      NextToken: nextToken,
-    })
-
-    if err != nil {
-      log.Fatal(err)
-    }
-
-    for _, v := range resp.LogStreams {
-      if aws.Int64Value(v.CreationTime) <= startUnixtime && endUnixtime <= aws.Int64Value(v.LastEventTimestamp) {
-        log.Print("Found log group: " + aws.StringValue(v.Arn))
-        log_events(svc, *group, *v.LogStreamName, startUnixtime, endUnixtime)
-      }
-    }
-
-    nextToken = resp.NextToken
-
-    if nextToken == nil {
-      break
-    }
-  }
-
-  log.Print("Generated log file: " + file)
+	log.Print("Generated log file: " + file)
 }

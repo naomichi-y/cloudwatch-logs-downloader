@@ -1,6 +1,6 @@
 # cloudwatch-logs-downloader
 
-Download logs for specified period from Amazon CloudWatch Logs.
+Download logs for specified period from Amazon CloudWatch Logs and output them to a file in JSON format.
 
 ## Setup
 
