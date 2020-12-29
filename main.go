@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -29,7 +30,7 @@ func write(data string) {
 	fmt.Fprintln(fp, data)
 }
 
-func searchLogEvents(service *cloudwatchlogs.CloudWatchLogs, group string, stream string, start int64, end int64) {
+func searchLogEvents(service *cloudwatchlogs.CloudWatchLogs, group string, stream string, start int64, end int64, reg *regexp.Regexp) {
 	log.Print("Searching log events...")
 
 	var token *string = nil
@@ -48,14 +49,18 @@ func searchLogEvents(service *cloudwatchlogs.CloudWatchLogs, group string, strea
 		}
 
 		for _, v := range resp.Events {
-			event := map[string]string{
-				"LogStream": stream,
-				"Message":   aws.StringValue(v.Message),
-				"Timestamp": time.Unix(aws.Int64Value(v.Timestamp)/1000, 0).String(),
-				"IngestionTime": time.Unix(aws.Int64Value(v.IngestionTime)/1000, 0).String(),
+			size := len(reg.String())
+
+			if size == 0 || size > 0 && reg.Match([]byte(*v.Message)) {
+				event := map[string]string{
+					"LogStream":     stream,
+					"Message":       aws.StringValue(v.Message),
+					"Timestamp":     time.Unix(aws.Int64Value(v.Timestamp)/1000, 0).String(),
+					"IngestionTime": time.Unix(aws.Int64Value(v.IngestionTime)/1000, 0).String(),
+				}
+				events = append(events, event)
+				log.Print(event)
 			}
-			events = append(events, event)
-			log.Print(event)
 		}
 
 		if aws.StringValue(token) == aws.StringValue(resp.NextForwardToken) {
@@ -66,7 +71,7 @@ func searchLogEvents(service *cloudwatchlogs.CloudWatchLogs, group string, strea
 	}
 }
 
-func searchLogGroup(service *cloudwatchlogs.CloudWatchLogs, group string, prefix string, start int64, end int64) {
+func searchLogGroup(service *cloudwatchlogs.CloudWatchLogs, group string, prefix string, start int64, end int64, reg *regexp.Regexp) {
 	log.Print("Searching log groups...")
 
 	var token *string
@@ -90,7 +95,7 @@ func searchLogGroup(service *cloudwatchlogs.CloudWatchLogs, group string, prefix
 		for _, v := range resp.LogStreams {
 			if aws.Int64Value(v.FirstEventTimestamp) <= start && end <= aws.Int64Value(v.LastEventTimestamp) {
 				log.Print("Found log group: " + aws.StringValue(v.Arn))
-				searchLogEvents(service, group, *v.LogStreamName, start, end)
+				searchLogEvents(service, group, *v.LogStreamName, start, end, reg)
 			}
 		}
 
@@ -110,6 +115,7 @@ func main() {
 	prefix := flag.String("prefix", "", "Prefix name when searching log groups")
 	start := flag.String("start", now.Add(-10*time.Minute).Format(layout), "Log stream event search start date and time (UTC)")
 	end := flag.String("end", now.Format(layout), "Log stream event search end date and time (UTC)")
+	pattern := flag.String("pattern", "", "Regular expressions for events to be extracted")
 
 	flag.Parse()
 
@@ -132,7 +138,7 @@ func main() {
 	)
 	file = "./dist/result_" + time.Now().Format("2006010230405") + ".log"
 
-	searchLogGroup(service, *group, *prefix, int64(s.Unix()*1000), int64(e.Unix()*1000))
+	searchLogGroup(service, *group, *prefix, int64(s.Unix()*1000), int64(e.Unix()*1000), regexp.MustCompile(*pattern))
 
 	if len(events) > 0 {
 		data, err := json.MarshalIndent(events, "", "  ")

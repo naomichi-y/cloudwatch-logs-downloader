@@ -23,6 +23,7 @@ $ docker run --rm -it --env-file=.env -v ${PWD}:/go/src/app cld -group={group}
 |`-prefix`||Prefix name when searching log groups||
 |`-start`||Log stream event search start date and time (UTC)|Start time will be 10 minutes before current time|
 |`-end`||Log stream event search end date and time (UTC)|Current time|
+|`-pattern`||Regular expressions for events to be extracted||
 
 ## Execution sample
 
