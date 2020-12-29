@@ -5,24 +5,29 @@ Download logs for specified period from Amazon CloudWatch Logs and output them t
 ## Setup
 
 ```bash
-# Set credential
+# Set AWS credential
 $ cp .env .env.default
 
-$ docker-compose build
+$ docker build -t cld .
 ```
 
-## Execution sample
+## Usage
 
 ```bash
-$ docker-compose up -d
-$ docker-compose exec app go run main.go -group=ecs/production-log -start="2020-12-27 15:59:00" -end="2020-12-27 15:59:59"
-
-2020/12/28 06:44:13 Generated log file: ./dist/result_2020122864407.log
+$ docker run --rm -it --env-file=.env -v ${PWD}:/go/src/app cld go run main.go -group={group}
 ```
 
 |Argumnet|Required|Description|Default|
 |---|---|---|---|
 |`-group`|Yes|Log group name||
 |`-prefix`||Prefix name when searching log groups||
-|`-start`||Filter start date and time (UTC)|Start time will be 5 minutes before current time|
+|`-start`||Filter start date and time (UTC)|Start time will be 10 minutes before current time|
 |`-end`||Filter end date and time (UTC)|Current time|
+
+## Execution sample
+
+```bash
+$ docker run --rm -it --env-file=.env -v ${PWD}:/go/src/app cld go run main.go -group=ecs/production-log -start="2020-12-27 15:59:00" -end="2020-12-27 15:59:59"
+
+2020/12/28 06:44:13 Generated log file: ./dist/result_2020122864407.log
+```

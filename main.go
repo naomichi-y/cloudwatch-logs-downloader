@@ -14,6 +14,7 @@ import (
 )
 
 var file string
+var events []map[string]string
 
 func write(data string) {
 	log.Print("Write results...")
@@ -28,11 +29,10 @@ func write(data string) {
 	fmt.Fprintln(fp, data)
 }
 
-func log_events(service *cloudwatchlogs.CloudWatchLogs, group string, stream string, start int64, end int64) {
+func searchLogEvents(service *cloudwatchlogs.CloudWatchLogs, group string, stream string, start int64, end int64) {
 	log.Print("Searching log events...")
 
 	var token *string = nil
-	var result []map[string]string
 
 	for {
 		resp, err := service.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{
@@ -48,13 +48,13 @@ func log_events(service *cloudwatchlogs.CloudWatchLogs, group string, stream str
 		}
 
 		for _, v := range resp.Events {
-			r := map[string]string{
+			event := map[string]string{
 				"LogStream": stream,
 				"Message":   aws.StringValue(v.Message),
 				"Timestamp": time.Unix(aws.Int64Value(v.Timestamp)/1000, 0).String(),
 			}
-			result = append(result, r)
-			log.Print(r)
+			events = append(events, event)
+			log.Print(event)
 		}
 
 		if aws.StringValue(token) == aws.StringValue(resp.NextForwardToken) {
@@ -63,20 +63,12 @@ func log_events(service *cloudwatchlogs.CloudWatchLogs, group string, stream str
 
 		token = resp.NextForwardToken
 	}
-
-	data, err := json.MarshalIndent(result, "", "  ")
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	write(string(data))
 }
 
-func search_log_group(service *cloudwatchlogs.CloudWatchLogs, group string, prefix string, start int64, end int64) {
+func searchLogGroup(service *cloudwatchlogs.CloudWatchLogs, group string, prefix string, start int64, end int64) {
 	log.Print("Searching log groups...")
 
-	var token *string = nil
+	var token *string
 
 	for {
 		input := &cloudwatchlogs.DescribeLogStreamsInput{
@@ -95,9 +87,9 @@ func search_log_group(service *cloudwatchlogs.CloudWatchLogs, group string, pref
 		}
 
 		for _, v := range resp.LogStreams {
-			if aws.Int64Value(v.CreationTime) <= start && end <= aws.Int64Value(v.LastEventTimestamp) {
+			if start <= aws.Int64Value(v.LastEventTimestamp) && aws.Int64Value(v.LastEventTimestamp) <= end {
 				log.Print("Found log group: " + aws.StringValue(v.Arn))
-				log_events(service, group, *v.LogStreamName, start, end)
+				searchLogEvents(service, group, *v.LogStreamName, start, end)
 			}
 		}
 
@@ -115,7 +107,7 @@ func main() {
 
 	group := flag.String("group", "", "Log group")
 	prefix := flag.String("prefix", "", "Log group prefix")
-	start := flag.String("start", now.Add(-5*time.Minute).Format(layout), "Start date")
+	start := flag.String("start", now.Add(-10*time.Minute).Format(layout), "Start date")
 	end := flag.String("end", now.Format(layout), "End date")
 
 	flag.Parse()
@@ -139,7 +131,18 @@ func main() {
 	)
 	file = "./dist/result_" + time.Now().Format("2006010230405") + ".log"
 
-	search_log_group(service, *group, *prefix, int64(s.Unix()*1000), int64(e.Unix()*1000))
+	searchLogGroup(service, *group, *prefix, int64(s.Unix()*1000), int64(e.Unix()*1000))
 
-	log.Print("Generated log file: " + file)
+	if len(events) > 0 {
+		data, err := json.MarshalIndent(events, "", "  ")
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		write(string(data))
+		log.Print("Generated log file: " + file)
+	} else {
+		log.Print("Event was not found.")
+	}
 }
