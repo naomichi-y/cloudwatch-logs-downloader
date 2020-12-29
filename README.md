@@ -21,13 +21,37 @@ $ docker run --rm -it --env-file=.env -v ${PWD}:/go/src/app cld go run main.go -
 |---|---|---|---|
 |`-group`|Yes|Log group name||
 |`-prefix`||Prefix name when searching log groups||
-|`-start`||Filter start date and time (UTC)|Start time will be 10 minutes before current time|
-|`-end`||Filter end date and time (UTC)|Current time|
+|`-start`||Log stream event search start date and time (UTC)|Start time will be 10 minutes before current time|
+|`-end`||Log stream event search end date and time (UTC)|Current time|
 
 ## Execution sample
 
 ```bash
 $ docker run --rm -it --env-file=.env -v ${PWD}:/go/src/app cld go run main.go -group=ecs/production-log -start="2020-12-27 15:59:00" -end="2020-12-27 15:59:59"
 
-2020/12/28 06:44:13 Generated log file: ./dist/result_2020122864407.log
+2020/12/29 07:05:42 Write results...
+2020/12/29 07:05:42 Generated log file: ./dist/result_2020122970533.log
+
+$ cat ./dist/result_2020122970533.log
+[
+  {
+    "IngestionTime": "2020-12-27 15:59:22 +0000 UTC",
+    "LogStream": "app/app/5302adeb527b42a0acbb11ac3444d98f",
+    "Message": "Foo",
+    "Timestamp": "2020-12-27 15:59:21 +0000 UTC"
+  },
+  {
+    "IngestionTime": "2020-12-27 15:59:22 +0000 UTC",
+    "LogStream": "app/app/5302adeb527b42a0acbb11ac3444d98f",
+    "Message": "Bar",
+    "Timestamp": "2020-12-27 15:59:21 +0000 UTC"
+  },
+  {
+    "IngestionTime": "2020-12-27 15:59:22 +0000 UTC",
+    "LogStream": "app/app/5302adeb527b42a0acbb11ac3444d98f",
+    "Message": "Baz",
+    "Timestamp": "2020-12-27 15:59:21 +0000 UTC"
+  },
+  ...
+]
 ```

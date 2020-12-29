@@ -52,6 +52,7 @@ func searchLogEvents(service *cloudwatchlogs.CloudWatchLogs, group string, strea
 				"LogStream": stream,
 				"Message":   aws.StringValue(v.Message),
 				"Timestamp": time.Unix(aws.Int64Value(v.Timestamp)/1000, 0).String(),
+				"IngestionTime": time.Unix(aws.Int64Value(v.IngestionTime)/1000, 0).String(),
 			}
 			events = append(events, event)
 			log.Print(event)
@@ -87,7 +88,7 @@ func searchLogGroup(service *cloudwatchlogs.CloudWatchLogs, group string, prefix
 		}
 
 		for _, v := range resp.LogStreams {
-			if start <= aws.Int64Value(v.LastEventTimestamp) && aws.Int64Value(v.LastEventTimestamp) <= end {
+			if aws.Int64Value(v.FirstEventTimestamp) <= start && end <= aws.Int64Value(v.LastEventTimestamp) {
 				log.Print("Found log group: " + aws.StringValue(v.Arn))
 				searchLogEvents(service, group, *v.LogStreamName, start, end)
 			}
@@ -107,8 +108,8 @@ func main() {
 
 	group := flag.String("group", "", "Log group name")
 	prefix := flag.String("prefix", "", "Prefix name when searching log groups")
-	start := flag.String("start", now.Add(-10*time.Minute).Format(layout), "Filter start date and time (UTC)")
-	end := flag.String("end", now.Format(layout), "Filter end date and time (UTC)")
+	start := flag.String("start", now.Add(-10*time.Minute).Format(layout), "Log stream event search start date and time (UTC)")
+	end := flag.String("end", now.Format(layout), "Log stream event search end date and time (UTC)")
 
 	flag.Parse()
 
