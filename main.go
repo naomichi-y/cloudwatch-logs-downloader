@@ -49,6 +49,7 @@ func log_events(service *cloudwatchlogs.CloudWatchLogs, group string, stream str
 
 		for _, v := range resp.Events {
 			r := map[string]string{
+				"LogStream": stream,
 				"Message":   aws.StringValue(v.Message),
 				"Timestamp": time.Unix(aws.Int64Value(v.Timestamp)/1000, 0).String(),
 			}
@@ -72,17 +73,22 @@ func log_events(service *cloudwatchlogs.CloudWatchLogs, group string, stream str
 	write(string(data))
 }
 
-func search_log_group(service *cloudwatchlogs.CloudWatchLogs, group string, start int64, end int64) {
+func search_log_group(service *cloudwatchlogs.CloudWatchLogs, group string, prefix string, start int64, end int64) {
 	log.Print("Searching log groups...")
 
 	var token *string = nil
 
 	for {
-		resp, err := service.DescribeLogStreams(&cloudwatchlogs.DescribeLogStreamsInput{
-			LogGroupName:        aws.String(group),
-			LogStreamNamePrefix: aws.String("app/app"),
-			NextToken:           token,
-		})
+		input := &cloudwatchlogs.DescribeLogStreamsInput{
+			LogGroupName: aws.String(group),
+			NextToken:    token,
+		}
+
+		if prefix != "" {
+			input.LogStreamNamePrefix = aws.String(prefix)
+		}
+
+		resp, err := service.DescribeLogStreams(input)
 
 		if err != nil {
 			log.Fatal(err)
@@ -104,10 +110,13 @@ func search_log_group(service *cloudwatchlogs.CloudWatchLogs, group string, star
 }
 
 func main() {
-	group := flag.String("group", "", "Log group")
-	start := flag.String("start", "", "Start date")
-	end := flag.String("end", "", "End date")
 	layout := "2006-01-02 15:04:05"
+	now := time.Now()
+
+	group := flag.String("group", "", "Log group")
+	prefix := flag.String("prefix", "", "Log group prefix")
+	start := flag.String("start", now.Add(-5*time.Minute).Format(layout), "Start date")
+	end := flag.String("end", now.Format(layout), "End date")
 
 	flag.Parse()
 
@@ -130,7 +139,7 @@ func main() {
 	)
 	file = "./dist/result_" + time.Now().Format("2006010230405") + ".log"
 
-	search_log_group(service, *group, int64(s.Unix() * 1000), int64(e.Unix() * 1000))
+	search_log_group(service, *group, *prefix, int64(s.Unix()*1000), int64(e.Unix()*1000))
 
 	log.Print("Generated log file: " + file)
 }
