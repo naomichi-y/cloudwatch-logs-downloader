@@ -20,6 +20,9 @@ $ docker-compose exec app go run main.go -group=ecs/production-log -start="2020-
 2020/12/28 06:44:13 Generated log file: ./dist/result_2020122864407.log
 ```
 
-* group: Log group name
-* start: Filter start date and time (UTC)
-* end: Filter end date and time (UTC)
+|Argumnet|Required|Description|Default|
+|---|---|---|---|
+|`-group`|Yes|Log group name||
+|`-prefix`||Prefix name when searching log groups||
+|`-start`||Filter start date and time (UTC)|Start time will be 5 minutes before current time|
+|`-end`||Filter end date and time (UTC)|Current time|
