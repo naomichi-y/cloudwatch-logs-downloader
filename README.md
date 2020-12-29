@@ -14,7 +14,7 @@ $ docker build -t cld .
 ## Usage
 
 ```bash
-$ docker run --rm -it --env-file=.env -v ${PWD}:/go/src/app cld go run main.go -group={group}
+$ docker run --rm -it --env-file=.env -v ${PWD}:/go/src/app cld -group={group}
 ```
 
 |Argumnet|Required|Description|Default|
@@ -27,7 +27,7 @@ $ docker run --rm -it --env-file=.env -v ${PWD}:/go/src/app cld go run main.go -
 ## Execution sample
 
 ```bash
-$ docker run --rm -it --env-file=.env -v ${PWD}:/go/src/app cld go run main.go -group=ecs/production-log -start="2020-12-27 15:59:00" -end="2020-12-27 15:59:59"
+$ docker run --rm -it --env-file=.env -v ${PWD}:/go/src/app cld -group=ecs/production-log -start="2020-12-27 15:59:00" -end="2020-12-27 15:59:59"
 
 2020/12/29 07:05:42 Write results...
 2020/12/29 07:05:42 Generated log file: ./dist/result_2020122970533.log
