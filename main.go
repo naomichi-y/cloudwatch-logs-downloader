@@ -19,7 +19,7 @@ var events []map[string]string
 func write(data string) {
 	log.Print("Write results...")
 
-	fp, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	fp, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE, 0644)
 
 	if err != nil {
 		log.Fatal(err)
@@ -105,10 +105,10 @@ func main() {
 	layout := "2006-01-02 15:04:05"
 	now := time.Now()
 
-	group := flag.String("group", "", "Log group")
-	prefix := flag.String("prefix", "", "Log group prefix")
-	start := flag.String("start", now.Add(-10*time.Minute).Format(layout), "Start date")
-	end := flag.String("end", now.Format(layout), "End date")
+	group := flag.String("group", "", "Log group name")
+	prefix := flag.String("prefix", "", "Prefix name when searching log groups")
+	start := flag.String("start", now.Add(-10*time.Minute).Format(layout), "Filter start date and time (UTC)")
+	end := flag.String("end", now.Format(layout), "Filter end date and time (UTC)")
 
 	flag.Parse()
 
