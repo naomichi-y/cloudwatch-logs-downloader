@@ -1,5 +1,8 @@
 # cloudwatch-logs-downloader
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/naomichi-y/cloudwatch-logs-downloader)](https://goreportcard.com/report/github.com/naomichi-y/cloudwatch-logs-downloader)
+[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
+
 Download logs for specified period from Amazon CloudWatch Logs and output them to a file in JSON format.
 
 ## Setup
