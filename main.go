@@ -134,7 +134,7 @@ func main() {
 	sess := session.Must(session.NewSession())
 	service := cloudwatchlogs.New(
 		sess,
-		aws.NewConfig().WithRegion(os.Getenv("AWS_REGION")),
+		aws.NewConfig().WithRegion(os.Getenv("AWS_REGION")).WithMaxRetries(10),
 	)
 	file = "./dist/result_" + time.Now().Format("2006010230405") + ".log"
 
