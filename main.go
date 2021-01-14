@@ -93,7 +93,7 @@ func searchLogGroup(service *cloudwatchlogs.CloudWatchLogs, group string, prefix
 		}
 
 		for _, v := range resp.LogStreams {
-			if aws.Int64Value(v.FirstEventTimestamp) <= start && end <= aws.Int64Value(v.LastEventTimestamp) {
+			if aws.Int64Value(v.FirstEventTimestamp) <= start && aws.Int64Value(v.LastEventTimestamp) <= end {
 				log.Print("Found log group: " + aws.StringValue(v.Arn))
 				searchLogEvents(service, group, *v.LogStreamName, start, end, reg)
 			}
