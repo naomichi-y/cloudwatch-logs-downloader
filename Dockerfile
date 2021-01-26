@@ -5,6 +5,6 @@ RUN go get -u github.com/aws/aws-sdk-go
 
 WORKDIR /go/src/app
 COPY . .
-RUN go build -o /go/bin/main main.go
+RUN cd src && go build -o /go/bin/main main.go
 
 ENTRYPOINT ["/go/bin/main"]

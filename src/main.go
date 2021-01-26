@@ -14,6 +14,24 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 )
 
+type LogEventFilter struct {
+	Service cloudwatchlogs.CloudWatchLogs
+	Group string
+	Stream string
+	Start int64
+	End int64
+	Reg regexp.Regexp
+}
+
+type LogGroupFilter struct {
+	Service cloudwatchlogs.CloudWatchLogs
+	Group string
+	Prefix string
+	Start int64
+	End int64
+	Reg regexp.Regexp
+}
+
 var file string
 var events []map[string]string
 
@@ -30,17 +48,17 @@ func write(data string) {
 	fmt.Fprintln(fp, data)
 }
 
-func searchLogEvents(service *cloudwatchlogs.CloudWatchLogs, group string, stream string, start int64, end int64, reg *regexp.Regexp) {
+func searchLogEvents(filter *LogEventFilter) {
 	log.Print("Searching log events...")
 
 	var token *string = nil
 
 	for {
-		resp, err := service.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{
-			LogGroupName:  aws.String(group),
-			LogStreamName: aws.String(stream),
-			StartTime:     aws.Int64(start),
-			EndTime:       aws.Int64(end),
+		resp, err := filter.Service.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{
+			LogGroupName:  aws.String(filter.Group),
+			LogStreamName: aws.String(filter.Stream),
+			StartTime:     aws.Int64(filter.Start),
+			EndTime:       aws.Int64(filter.End),
 			NextToken:     token,
 		})
 
@@ -49,11 +67,11 @@ func searchLogEvents(service *cloudwatchlogs.CloudWatchLogs, group string, strea
 		}
 
 		for _, v := range resp.Events {
-			size := len(reg.String())
+			size := len(filter.Reg.String())
 
-			if size == 0 || size > 0 && reg.Match([]byte(*v.Message)) {
+			if size == 0 || size > 0 && filter.Reg.Match([]byte(*v.Message)) {
 				event := map[string]string{
-					"LogStream":     stream,
+					"LogStream":     filter.Stream,
 					"Message":       aws.StringValue(v.Message),
 					"Timestamp":     time.Unix(aws.Int64Value(v.Timestamp)/1000, 0).String(),
 					"IngestionTime": time.Unix(aws.Int64Value(v.IngestionTime)/1000, 0).String(),
@@ -71,31 +89,42 @@ func searchLogEvents(service *cloudwatchlogs.CloudWatchLogs, group string, strea
 	}
 }
 
-func searchLogGroup(service *cloudwatchlogs.CloudWatchLogs, group string, prefix string, start int64, end int64, reg *regexp.Regexp) {
+func searchLogGroup(filter *LogGroupFilter) {
 	log.Print("Searching log groups...")
 
 	var token *string
 
 	for {
 		input := &cloudwatchlogs.DescribeLogStreamsInput{
-			LogGroupName: aws.String(group),
+			LogGroupName: aws.String(filter.Group),
 			NextToken:    token,
 		}
 
-		if prefix != "" {
-			input.LogStreamNamePrefix = aws.String(prefix)
+		if filter.Prefix != "" {
+			input.LogStreamNamePrefix = aws.String(filter.Prefix)
 		}
 
-		resp, err := service.DescribeLogStreams(input)
+		resp, err := filter.Service.DescribeLogStreams(input)
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		for _, v := range resp.LogStreams {
-			if aws.Int64Value(v.FirstEventTimestamp) <= start && aws.Int64Value(v.LastEventTimestamp) <= end {
+			if aws.Int64Value(v.FirstEventTimestamp) <= filter.Start && filter.End <= aws.Int64Value(v.LastIngestionTime) {
 				log.Print("Found log group: " + aws.StringValue(v.Arn))
-				searchLogEvents(service, group, *v.LogStreamName, start, end, reg)
+				log.Print(time.Unix(aws.Int64Value(v.FirstEventTimestamp)/1000, 0))
+				log.Print(time.Unix(filter.Start/1000, 0))
+				log.Print(time.Unix(aws.Int64Value(v.LastEventTimestamp)/1000, 0))
+				log.Print(time.Unix(filter.End / 1000, 0))
+				searchLogEvents(&LogEventFilter{
+					Service: filter.Service,
+					Group: filter.Group,
+					Stream: *v.LogStreamName,
+					Start: filter.Start,
+					End: filter.End,
+					Reg: filter.Reg,
+				})
 			}
 		}
 
@@ -138,7 +167,14 @@ func main() {
 	)
 	file = "./dist/result_" + time.Now().Format("2006010230405") + ".log"
 
-	searchLogGroup(service, *group, *prefix, int64(s.Unix()*1000), int64(e.Unix()*1000), regexp.MustCompile(*pattern))
+	searchLogGroup(&LogGroupFilter{
+		Service: *service,
+		Group: *group,
+		Prefix: *prefix,
+		Start: int64(s.Unix()*1000),
+		End: int64(e.Unix()*1000),
+		Reg: *regexp.MustCompile(*pattern),
+	})
 
 	if len(events) > 0 {
 		data, err := json.MarshalIndent(events, "", "  ")
