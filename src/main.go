@@ -32,6 +32,7 @@ type LogGroupFilter struct {
 	Reg regexp.Regexp
 }
 
+var layout = "2006-01-02 15:04:05"
 var file string
 var events []map[string]string
 
@@ -111,12 +112,11 @@ func searchLogGroup(filter *LogGroupFilter) {
 		}
 
 		for _, v := range resp.LogStreams {
-			if aws.Int64Value(v.FirstEventTimestamp) <= filter.Start && filter.End <= aws.Int64Value(v.LastIngestionTime) {
-				log.Print("Found log group: " + aws.StringValue(v.Arn))
-				log.Print(time.Unix(aws.Int64Value(v.FirstEventTimestamp)/1000, 0))
-				log.Print(time.Unix(filter.Start/1000, 0))
-				log.Print(time.Unix(aws.Int64Value(v.LastEventTimestamp)/1000, 0))
-				log.Print(time.Unix(filter.End / 1000, 0))
+			if filter.Start <= aws.Int64Value(v.LastIngestionTime) && aws.Int64Value(v.FirstEventTimestamp) <= filter.End {
+				log.Print("Found log group:     " + aws.StringValue(v.Arn))
+				log.Print("FirstEventTimestamp: " + time.Unix(aws.Int64Value(v.FirstEventTimestamp)/1000, 0).Format(layout))
+				log.Print("LastIngestionTime:   " + time.Unix(aws.Int64Value(v.LastIngestionTime)/1000, 0).Format(layout))
+
 				searchLogEvents(&LogEventFilter{
 					Service: filter.Service,
 					Group: filter.Group,
@@ -137,7 +137,6 @@ func searchLogGroup(filter *LogGroupFilter) {
 }
 
 func main() {
-	layout := "2006-01-02 15:04:05"
 	now := time.Now()
 
 	group := flag.String("group", "", "Log group name")
